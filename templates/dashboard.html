@@ -1,0 +1,7 @@
+{% extends 'base.html' %}{% block content %}
+<div class="page-title"><div><h1>Visão do mês</h1><p>O previsto considera os saldos atuais e somente os lançamentos ainda pendentes do mês selecionado.</p></div><a class="button" href="{{ url_for('transactions', kind='expense') }}">Nova despesa</a></div>
+<nav class="dashboard-month-nav" aria-label="Navegação entre meses"><a href="{{ url_for('dashboard', month=previous_month) }}">← Mês anterior</a><strong>{{ selected_month[5:7] }}/{{ selected_month[:4] }}</strong><a href="{{ url_for('dashboard', month=next_month) }}">Próximo mês →</a></nav>
+<section class="cards"><article><span>{{ 'Saldo do fim do mês anterior' if is_future_month else 'Saldo atual nos bancos' }}</span><strong>{{ opening_balance|brl }}</strong></article><article class="income"><span>Receitas pendentes</span><strong>{{ pending_income|brl }}</strong></article><article class="expense"><span>Despesas pendentes</span><strong>{{ pending_expense|brl }}</strong></article><article class="forecast"><span>Saldo no fim do mês</span><strong>{{ forecast|brl }}</strong></article></section>
+<section class="panel"><h2>Saldos informados</h2><div class="account-list">{% for account in accounts %}<div><span>{{ account.name }}</span><strong>{{ account.balance|brl }}</strong><small>Atualizado em {{ account.updated_at[:16].replace('T', ' ') }}</small></div>{% endfor %}</div></section>
+<section class="panel"><h2>Lançamentos de {{ selected_month[5:7] }}/{{ selected_month[:4] }}</h2>{% include '_transaction_table.html' %}</section>
+{% endblock %}

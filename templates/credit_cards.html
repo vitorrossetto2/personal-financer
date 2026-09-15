@@ -1,0 +1,51 @@
+{% extends 'base.html' %}{% block content %}
+<div class="page-title"><div><h1>Cartões de crédito</h1><p>As compras entram no orçamento do mês em que a fatura é paga.</p></div></div>
+
+<div class="credit-card-layout">
+  <section class="panel"><h2>Cadastrar cartão</h2><form method="post" class="form-grid">
+    <label>Nome<input name="name" placeholder="Ex.: Itaú Black" required></label>
+    <label>Emissor<select name="issuer" required><option value="itau">Itaú</option><option value="bradesco">Bradesco</option></select></label>
+    <label>Final do cartão<input name="last_four" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" placeholder="2788" required></label>
+    <label>Dia de pagamento<input name="payment_day" type="number" min="1" max="31" required></label>
+    <button>Cadastrar cartão</button>
+  </form></section>
+
+  <section class="panel"><h2>Consultar fatura</h2>
+    {% if cards %}<form method="get" class="filter-form">
+      <label>Cartão<select name="card_id">{% for card in cards %}<option value="{{ card.id }}" {{ 'selected' if selected_card and card.id == selected_card.id else '' }}>{{ card.name }} · final {{ card.last_four }}</option>{% endfor %}</select></label>
+      <label>Mês do pagamento<input name="month" type="month" value="{{ billing_month }}" required></label><button>Consultar</button>
+    </form>{% else %}<p>Cadastre seu primeiro cartão para começar.</p>{% endif %}
+  </section>
+</div>
+
+{% if selected_card %}
+<section class="invoice-heading panel">
+  <div><span class="eyebrow">{{ selected_card.issuer|upper }} · final {{ selected_card.last_four }}</span><h2>{{ selected_card.name }}</h2><p>Pagamento previsto em {{ payment_date|date_br }}</p></div>
+  <div class="invoice-total"><span>Total da fatura</span><strong>{{ total|brl }}</strong><small>{{ rows|length }} lançamento(s)</small></div>
+  <div class="month-nav"><a href="{{ url_for('credit_cards', card_id=selected_card.id, month=previous_month) }}">← Anterior</a><strong>{{ billing_month[5:7] }}/{{ billing_month[:4] }}</strong><a href="{{ url_for('credit_cards', card_id=selected_card.id, month=next_month) }}">Próximo →</a></div>
+</section>
+
+<div class="two-columns">
+  <section class="panel"><h2>Nova despesa no cartão</h2><form method="post" action="{{ url_for('create_credit_card_expense') }}" class="form-grid">
+    <input type="hidden" name="card_id" value="{{ selected_card.id }}"><input type="hidden" name="billing_month" value="{{ billing_month }}">
+    <label>Descrição<input name="description" required></label><label>Categoria<input name="category" placeholder="Ex.: Alimentação"></label>
+    <label>Valor (R$)<input name="amount" inputmode="decimal" placeholder="0,00" required></label><label>Data da compra<input name="purchase_date" type="date" value="{{ today }}" required></label>
+    <button>Cadastrar despesa</button>
+  </form></section>
+
+  <section class="panel"><h2>Importar fatura</h2>
+    {% if selected_card.issuer == 'itau' %}<p class="panel-help">Envie novamente a fatura aberta quando quiser. Lançamentos existentes são ignorados e somente as novas compras são incluídas.</p>
+    <form method="post" action="{{ url_for('import_credit_card_expenses') }}" enctype="multipart/form-data" class="stack-form">
+      <input type="hidden" name="card_id" value="{{ selected_card.id }}"><input type="hidden" name="billing_month" value="{{ billing_month }}">
+      <label>Planilha do Itaú (.xlsx)<input type="file" name="statement" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required></label>
+      <label>Categoria<input name="category" value="Cartão de crédito"></label><button>Importar fatura</button>
+    </form>{% else %}<div class="unavailable"><strong>Importação do Bradesco em breve</strong><p>O cartão pode ser usado para lançamentos manuais; o leitor de fatura será implementado depois.</p></div>{% endif %}
+  </section>
+</div>
+
+<section class="panel"><h2>Lançamentos da fatura</h2><div class="table-wrap"><table><thead><tr><th>Compra</th><th>Descrição</th><th>Cartão / portador</th><th>Valor</th><th>Situação</th><th></th></tr></thead><tbody>
+  {% for row in rows %}<tr class="{{ 'settled-row' if row.status == 'settled' else ('overdue-row' if row.overdue else '') }}"><td>{{ row.purchase_date|date_br }}</td><td><b>{{ row.description }}</b>{% if row.category %}<small>{{ row.category }}</small>{% endif %}{% if row.installment_total %}<small>Parcela {{ row.installment_number }}/{{ row.installment_total }}</small>{% endif %}{% if row.card_installment_projected %}<small class="projected-label">Prevista a partir da fatura anterior</small>{% elif row.import_source %}<small>Importada de {{ row.import_source }}</small>{% endif %}</td><td>{% if row.card_last_four %}final {{ row.card_last_four }}{% else %}final {{ selected_card.last_four }}{% endif %}{% if row.cardholder_name %}<small>{{ row.cardholder_name }}</small>{% endif %}</td><td class="expense">− {{ row.amount|brl }}</td><td>{% if row.status == 'settled' %}<span class="badge settled">Paga</span>{% elif row.overdue %}<span class="badge overdue">Em atraso</span>{% elif row.card_installment_projected %}<span class="badge projected">Prevista</span>{% else %}<span class="badge pending">Pendente</span>{% endif %}</td><td><div class="row-actions"><form method="post" action="{{ url_for('settle', transaction_id=row.id) }}"><button class="link-button">{{ 'Desfazer' if row.status == 'settled' else 'Dar baixa' }}</button></form><form method="post" action="{{ url_for('delete_transaction', transaction_id=row.id) }}"><button class="link-button danger">Excluir</button></form></div></td></tr>
+  {% else %}<tr><td colspan="6" class="empty">Nenhum lançamento nesta fatura.</td></tr>{% endfor %}
+</tbody></table></div></section>
+{% endif %}
+{% endblock %}

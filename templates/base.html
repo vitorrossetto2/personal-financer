@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NovoSaldo</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <header>
+    <div class="brand"><a href="{{ url_for('dashboard') }}">NovoSaldo</a><span>controle financeiro</span></div>
+    <nav>
+      <a href="{{ url_for('dashboard') }}">Visão mensal</a>
+      <a href="{{ url_for('manage_accounts') }}">Contas</a>
+      <a href="{{ url_for('transactions', kind='income') }}">Receitas</a>
+      <a href="{{ url_for('transactions', kind='expense') }}">Despesas</a>
+      <a href="{{ url_for('credit_cards') }}">Cartões</a>
+      <a href="{{ url_for('deleted_transactions') }}">Excluídos</a>
+      <a href="{{ url_for('projection') }}">Projeção</a>
+      <form action="{{ url_for('logout') }}" method="post"><button class="nav-button" type="submit">Sair</button></form>
+    </nav>
+  </header>
+  <main>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}<div class="flash {{ category }}">{{ message }}</div>{% endfor %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

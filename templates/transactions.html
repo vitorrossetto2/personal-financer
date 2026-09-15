@@ -1,0 +1,19 @@
+{% extends 'base.html' %}{% block content %}
+{% set title = 'Receitas' if kind == 'income' else 'Despesas' %}
+<div class="page-title"><div><h1>{{ title }}</h1><p>Cadastre lançamentos únicos, fixos mensais ou parcelamentos; dê baixa conforme receber ou pagar.</p></div></div>
+<div class="two-columns">
+  <section class="panel"><h2>Nova {{ 'receita' if kind == 'income' else 'despesa' }}</h2><form method="post" class="form-grid">
+    <label>Descrição<input name="description" required></label><label>Categoria<input name="category" placeholder="Ex.: Moradia"></label>
+    <label>Valor (R$)<input name="amount" inputmode="decimal" placeholder="0,00" required></label><label>Data prevista<input name="due_date" type="date" value="{{ today }}" required></label>
+    <label class="check"><input type="checkbox" name="is_fixed"> Repetir mensalmente (fixa)</label><button>Cadastrar</button>
+  </form></section>
+  <section class="panel"><h2>Parcelar {{ 'valor a receber' if kind == 'income' else 'despesa' }}</h2><form method="post" action="{{ url_for('installments', kind=kind) }}" class="form-grid">
+    <label>Descrição<input name="description" required></label><label>Categoria<input name="category"></label>
+    <label>Valor total (R$)<input name="amount" inputmode="decimal" placeholder="0,00" required></label><label>1º vencimento<input name="due_date" type="date" value="{{ today }}" required></label>
+    <label>Nº de parcelas<input name="installment_total" type="number" min="2" max="240" required></label><button>Criar parcelas</button>
+  </form></section>
+</div>
+{% if kind == 'expense' %}<section class="panel card-module-callout"><div><h2>Despesas de cartão</h2><p>Cadastre cartões, acompanhe faturas por mês e importe a planilha do Itaú na área dedicada.</p></div><a class="button" href="{{ url_for('credit_cards') }}">Abrir controle de cartões</a></section>{% endif %}
+<section class="panel"><h2>{{ title }} cadastradas</h2>{% include '_transaction_table.html' %}</section>
+<section class="panel"><h2>{{ title }} fixas</h2><div class="table-wrap"><table><thead><tr><th>Descrição</th><th>Dia</th><th>Valor</th><th>Situação</th><th></th></tr></thead><tbody>{% for rule in rules %}<tr><td>{{ rule.description }}</td><td>{{ rule.day_of_month }}</td><td class="{{ rule.kind }}">{{ rule.amount|brl }}</td><td>{{ 'Ativa' if rule.active else 'Pausada' }}</td><td><form method="post" action="{{ url_for('toggle_recurrence', rule_id=rule.id) }}"><button class="link-button">{{ 'Pausar' if rule.active else 'Ativar' }}</button></form></td></tr>{% else %}<tr><td colspan="5" class="empty">Nenhum lançamento fixo.</td></tr>{% endfor %}</tbody></table></div></section>
+{% endblock %}

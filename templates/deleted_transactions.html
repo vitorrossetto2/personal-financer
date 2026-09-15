@@ -1,0 +1,6 @@
+{% extends 'base.html' %}{% block content %}
+<div class="page-title"><div><h1>Lançamentos excluídos</h1><p>Consulte os lançamentos removidos e restaure o que precisar.</p></div></div>
+<section class="panel"><div class="table-wrap"><table><thead><tr><th>Data</th><th>Descrição</th><th>Tipo</th><th>Valor</th><th>Excluído em</th><th></th></tr></thead><tbody>
+{% for row in rows %}<tr><td>{{ row.due_date|date_br }}</td><td><b>{{ row.description }}</b>{% if row.category %}<small>{{ row.category }}</small>{% endif %}{% if row.installment_total %}<small>Parcela {{ row.installment_number }}/{{ row.installment_total }}</small>{% endif %}</td><td>{{ 'Receita' if row.kind == 'income' else 'Despesa' }}</td><td class="{{ row.kind }}">{{ '+' if row.kind == 'income' else '−' }} {{ row.amount|brl }}</td><td>{{ row.deleted_at[:10]|date_br }}</td><td><form method="post" action="{{ url_for('restore_transaction', transaction_id=row.id) }}"><button class="link-button">Restaurar</button></form></td></tr>{% else %}<tr><td colspan="6" class="empty">Nenhum lançamento excluído.</td></tr>{% endfor %}
+</tbody></table></div></section>
+{% endblock %}

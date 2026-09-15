@@ -1,0 +1,17 @@
+[project]
+name = "novosaldo"
+version = "0.1.0"
+description = "Controle financeiro pessoal local com Flask e SQLite"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "Authlib>=1.6,<2.0",
+    "Flask>=3.0,<4.0",
+    "mcp[cli]>=2.0.0",
+    "openpyxl>=3.1.5",
+    "python-dotenv>=1.0,<2.0",
+    "requests>=2.32,<3.0",
+]
+
+[tool.uv]
+package = false
