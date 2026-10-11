@@ -23,11 +23,13 @@ class FinanceService:
         last_day = date(year, month, calendar.monthrange(year, month)[1]).isoformat()
         rules = self.recurrences.list_active_for_period(first_day, last_day)
         created_at = datetime.now().isoformat(timespec="seconds")
+        entries = []
         for rule in rules:
             due = month_date(year, month, rule["day_of_month"]).isoformat()
             if due < rule["start_date"] or (rule["end_date"] and due > rule["end_date"]):
                 continue
-            self.transactions.create_from_recurrence(rule, due, created_at)
+            entries.append((rule, due, created_at))
+        self.transactions.create_recurrences(entries)
         self.connection.commit()
 
     @staticmethod
@@ -152,17 +154,18 @@ class FinanceService:
         base = (amount / count).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
         group = f"{kind}-{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
         created_at = datetime.now().isoformat(timespec="seconds")
-        transaction_ids = []
+        entries = []
         for number in range(1, count + 1):
             year = first_due_date.year + (first_due_date.month - 1 + number - 1) // 12
             month = (first_due_date.month - 1 + number - 1) % 12 + 1
             part = base if number < count else amount - base * (count - 1)
-            transaction_ids.append(self.transactions.create(
+            entries.append(dict(
                 kind=kind, description=description, category=category, amount=float(part),
                 due_date=month_date(year, month, first_due_date.day).isoformat(),
                 created_at=created_at, account_id=None, installment_group=group,
                 installment_number=number, installment_total=count,
             ))
+        transaction_ids = self.transactions.create_many(entries)
         self.connection.commit()
         return {"installment_group": group, "transaction_ids": transaction_ids, "count": count}
 

@@ -108,3 +108,10 @@ def initialize(connection: sqlite3.Connection) -> None:
     connection.execute("UPDATE transactions SET account_id = NULL")
     connection.execute("UPDATE recurrences SET account_id = NULL")
     connection.commit()
+
+
+def execute_batch(connection, statements):
+    """Execute one atomic D1 batch, or use the caller's SQLite transaction."""
+    if hasattr(connection, "execute_batch"):
+        return connection.execute_batch(statements)
+    return [connection.execute(sql, parameters) for sql, parameters in statements]

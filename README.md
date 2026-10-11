@@ -72,3 +72,11 @@ Para executar apenas o MCP, sem a interface web, use `uv run python mcp_server.p
 - Faturas do Itaú em `.xlsx` podem ser reenviadas enquanto estão abertas: lançamentos já existentes naquele cartão e mês são ignorados, e somente as novas compras são incluídas. Pagamentos, créditos e linhas inválidas também são ignorados.
 - Ao importar uma compra parcelada, as parcelas restantes são previstas automaticamente nas próximas faturas. Quando uma dessas faturas for importada, a previsão é confirmada ou atualizada sem duplicar a despesa.
 - O cadastro e os lançamentos manuais do Bradesco já estão disponíveis; a importação da fatura do Bradesco ficou preparada para uma implementação futura específica.
+
+
+## Cloudflare Workers + D1
+
+A aplicação também pode ser publicada como Python Worker, usando o banco D1
+`personal-financer`. Consulte [o guia de publicação](cloudflare/README.md) para
+configurar o banco existente, migrar dados locais, cadastrar os segredos Google e
+publicar no Worker `personal-financer`.

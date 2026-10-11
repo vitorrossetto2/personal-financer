@@ -286,6 +286,11 @@ class CreditCardService:
 
     def save_statement(self, statement: dict, filename: str, *, credit_card_id: int,
                        category: str = "Cartão de crédito") -> dict:
+        if hasattr(self.connection, "plan_card_import"):
+            with self.connection.plan_card_import(credit_card_id) as plan:
+                return CreditCardService(plan).save_statement(
+                    statement, filename, credit_card_id=credit_card_id, category=category,
+                )
         card = self.cards.find_active(credit_card_id)
         if not card:
             raise ValueError("Cartão não encontrado.")

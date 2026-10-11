@@ -1,0 +1,4 @@
+GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-client-secret
+NOVOSALDO_ALLOWED_EMAIL=your-email@gmail.com
+NOVOSALDO_SECRET_KEY=replace-with-a-random-session-secret

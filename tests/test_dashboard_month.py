@@ -1,6 +1,8 @@
 import sqlite3
 import tempfile
 import unittest
+from datetime import date
+from unittest.mock import patch
 from pathlib import Path
 
 import app as novosaldo
@@ -8,6 +10,13 @@ import app as novosaldo
 
 class DashboardMonthNavigationTests(unittest.TestCase):
     def setUp(self):
+        class FixedDate(date):
+            @classmethod
+            def today(cls):
+                return cls(2026, 9, 14)
+        clock = patch.object(novosaldo, "date", FixedDate)
+        clock.start()
+        self.addCleanup(clock.stop)
         self.directory = tempfile.TemporaryDirectory()
         novosaldo.DATABASE = Path(self.directory.name) / "test.db"
         novosaldo.app.config.update(TESTING=True, SECRET_KEY="test", AUTH_DISABLED_FOR_TESTS=True)

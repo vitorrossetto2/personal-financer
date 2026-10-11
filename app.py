@@ -4,13 +4,13 @@ import ipaddress
 import os
 import secrets
 import sqlite3
+import sys
 from datetime import date, datetime
 from pathlib import Path
 from zipfile import BadZipFile
 
-from authlib.integrations.flask_client import OAuth
 from dotenv import load_dotenv
-from flask import Flask, abort, flash, g, redirect, render_template, request, session, url_for
+from flask import Flask, abort, flash, g, has_request_context, jsonify, redirect, render_template, request, session, url_for
 from openpyxl.utils.exceptions import InvalidFileException
 from werkzeug.utils import secure_filename
 
@@ -28,11 +28,13 @@ from services import (
 BASE_DIR = Path(__file__).resolve().parent
 DATABASE = BASE_DIR / "instance" / "financeiro.db"
 
-load_dotenv(BASE_DIR / ".env")
+IS_WORKER = sys.platform == "emscripten"
+if not IS_WORKER:
+    load_dotenv(BASE_DIR / ".env")
 
 app = Flask(__name__)
 app.config.update(
-    SECRET_KEY=os.environ.get("NOVOSALDO_SECRET_KEY") or secrets.token_hex(32),
+    SECRET_KEY=None if IS_WORKER else (os.environ.get("NOVOSALDO_SECRET_KEY") or secrets.token_hex(32)),
     MAX_CONTENT_LENGTH=8 * 1024 * 1024,
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
@@ -45,19 +47,29 @@ app.config.update(
     AUTH_DISABLED_FOR_TESTS=False,
 )
 
-oauth = OAuth(app)
-google = oauth.register(
-    name="google",
-    client_id=app.config["GOOGLE_CLIENT_ID"],
-    client_secret=app.config["GOOGLE_CLIENT_SECRET"],
-    server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
-    client_kwargs={"scope": "openid email profile"},
-)
+if IS_WORKER:
+    from worker_auth import WorkerGoogleOAuth
+    google = WorkerGoogleOAuth()
+else:
+    from authlib.integrations.flask_client import OAuth
+    oauth = OAuth(app)
+    google = oauth.register(
+        name="google",
+        client_id=app.config["GOOGLE_CLIENT_ID"],
+        client_secret=app.config["GOOGLE_CLIENT_SECRET"],
+        server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
+        client_kwargs={"scope": "openid email profile"},
+    )
+
 
 
 def db():
     if "db" not in g:
-        g.db = connect(DATABASE)
+        if has_request_context() and "workers.env" in request.environ:
+            from d1_database import D1Connection
+            g.db = D1Connection(request.environ["workers.env"].DB)
+        else:
+            g.db = connect(DATABASE)
     return g.db
 
 
@@ -70,7 +82,8 @@ def credit_card_service() -> CreditCardService:
 
 
 def initialize_database() -> None:
-    initialize(db())
+    if not has_request_context() or "workers.env" not in request.environ:
+        initialize(db())
 
 
 def ensure_recurrences_for_month(year: int, month: int) -> None:
@@ -97,7 +110,7 @@ def auth_configuration_errors() -> list[str]:
         missing.append("GOOGLE_CLIENT_SECRET")
     if not app.config["ALLOWED_GOOGLE_EMAIL"]:
         missing.append("NOVOSALDO_ALLOWED_EMAIL")
-    if not os.environ.get("NOVOSALDO_SECRET_KEY") and not app.testing:
+    if not (app.config.get("WORKER_SECRET_CONFIGURED") or os.environ.get("NOVOSALDO_SECRET_KEY")) and not app.testing:
         missing.append("NOVOSALDO_SECRET_KEY")
     return missing
 
@@ -383,7 +396,10 @@ def settle(transaction_id):
     status = finance_service().toggle_transaction_status(transaction_id, date.today())
     if status is None:
         abort(404)
-    flash("Baixa desfeita." if status == "pending" else "Lançamento baixado.", "success")
+    message = "Baixa desfeita." if status == "pending" else "Lançamento baixado."
+    if request.accept_mimetypes.best == "application/json":
+        return jsonify(status=status, message=message)
+    flash(message, "success")
     return redirect(request.referrer or url_for("dashboard"))
 
 
@@ -397,6 +413,8 @@ def settle_credit_card_invoice(card_id, billing_month):
     if status is None:
         abort(404)
     message = "Baixa da fatura desfeita." if status == "pending" else "Fatura baixada."
+    if request.accept_mimetypes.best == "application/json":
+        return jsonify(status=status, message=message)
     flash(message, "success")
     return redirect(request.referrer or url_for("transactions", kind="expense"))
 

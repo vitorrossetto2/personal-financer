@@ -1,0 +1,7 @@
+{
+  "name": "personal-financer-worker",
+  "private": true,
+  "devDependencies": {
+    "wrangler": "4.132.0"
+  }
+}

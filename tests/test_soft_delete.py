@@ -46,11 +46,11 @@ class SoftDeleteTests(unittest.TestCase):
         self.assertIn("Bloco Tati", active_page.get_data(as_text=True))
 
     def test_deleted_transaction_is_removed_from_dashboard_totals(self):
-        before = self.client.get("/").get_data(as_text=True)
+        before = self.client.get("/?month=2026-09").get_data(as_text=True)
         self.assertIn("Bloco Tati", before)
 
         self.client.post(f"/lancamentos/{self.transaction_id}/excluir")
-        after = self.client.get("/").get_data(as_text=True)
+        after = self.client.get("/?month=2026-09").get_data(as_text=True)
         self.assertNotIn("Bloco Tati", after)
 
 

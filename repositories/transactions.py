@@ -2,8 +2,18 @@ from __future__ import annotations
 
 import sqlite3
 
+from repositories.card_identity import equivalent_description
+
+from database import execute_batch
+
 
 class TransactionRepository:
+    INSERT_SQL = """INSERT INTO transactions
+               (kind, description, category, amount, due_date, account_id, recurrence_id,
+                installment_group, installment_number, installment_total, purchase_date,
+                credit_card_id, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+
     def __init__(self, connection: sqlite3.Connection):
         self.connection = connection
 
@@ -12,16 +22,32 @@ class TransactionRepository:
                installment_group=None, installment_number=None, installment_total=None,
                purchase_date=None, credit_card_id=None) -> int:
         cursor = self.connection.execute(
-            """INSERT INTO transactions
-               (kind, description, category, amount, due_date, account_id, recurrence_id,
-                installment_group, installment_number, installment_total, purchase_date,
-                credit_card_id, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            self.INSERT_SQL,
             (kind, description, category, amount, due_date, account_id, recurrence_id,
              installment_group, installment_number, installment_total, purchase_date,
              credit_card_id, created_at),
         )
         return cursor.lastrowid
+
+    def create_many(self, entries):
+        columns = ("kind", "description", "category", "amount", "due_date", "account_id",
+                   "recurrence_id", "installment_group", "installment_number",
+                   "installment_total", "purchase_date", "credit_card_id", "created_at")
+        cursors = execute_batch(self.connection, [
+            (self.INSERT_SQL, tuple(entry.get(column) for column in columns))
+            for entry in entries
+        ])
+        return [cursor.lastrowid for cursor in cursors]
+
+    def create_recurrences(self, entries):
+        execute_batch(self.connection, [
+            ("""INSERT OR IGNORE INTO transactions
+                (kind, description, category, amount, due_date, account_id, recurrence_id, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+             (rule["kind"], rule["description"], rule["category"], rule["amount"], due_date,
+              rule["account_id"], rule["id"], created_at))
+            for rule, due_date, created_at in entries
+        ])
 
     def create_from_recurrence(self, rule, due_date: str, created_at: str) -> bool:
         cursor = self.connection.execute(
@@ -78,7 +104,7 @@ class TransactionRepository:
     def _find_equivalent_card_entry(self, entry: dict, *, credit_card_id: int, due_date: str):
         """Localiza a ocorrência equivalente criada por versões antigas da chave de importação."""
         parameters = [
-            credit_card_id, due_date, entry["purchase_date"], entry["description"],
+            credit_card_id, due_date, entry["purchase_date"],
             entry.get("installment_number"), entry.get("installment_number"),
             entry.get("installment_total"), entry.get("installment_total"),
             entry.get("cardholder_name") or "", entry.get("card_last_four") or "",
@@ -87,20 +113,22 @@ class TransactionRepository:
         if not entry.get("installment_number"):
             amount_filter = " AND amount = ?"
             parameters.append(entry["amount"])
-        parameters.append(max(int(entry.get("occurrence") or 1) - 1, 0))
-        return self.connection.execute(
+        candidates = self.connection.execute(
             f"""SELECT * FROM transactions
                 WHERE credit_card_id = ? AND due_date = ? AND purchase_date = ?
-                  AND description = ?
                   AND (installment_number = ? OR (installment_number IS NULL AND ? IS NULL))
                   AND (installment_total = ? OR (installment_total IS NULL AND ? IS NULL))
                   AND COALESCE(cardholder_name, '') = ?
                   AND COALESCE(card_last_four, '') = ?
                   AND deleted_at IS NULL{amount_filter}
                 ORDER BY id
-                LIMIT 1 OFFSET ?""",
+                """,
             parameters,
-        ).fetchone()
+        ).fetchall()
+        matches = [row for row in candidates
+                   if equivalent_description(row["description"], entry["description"])]
+        offset = max(int(entry.get("occurrence") or 1) - 1, 0)
+        return matches[offset] if offset < len(matches) else None
 
     def _confirm_projected_entry(self, transaction_id: int, entry: dict, *, due_date: str,
                                  category: str, filename: str) -> None:
