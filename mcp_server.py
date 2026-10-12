@@ -411,9 +411,10 @@ def importar_fatura_cartao(
 
 
 if __name__ == "__main__":
-    server.run(
-        transport="streamable-http",
-        host=os.environ.get("NOVOSALDO_MCP_HOST", "127.0.0.1"),
-        port=int(os.environ.get("NOVOSALDO_MCP_PORT", "8000")),
-        streamable_http_path="/mcp",
-    )
+    import uvicorn
+    from mcp_auth import MCPTokenAuth
+
+    host = os.environ.get("NOVOSALDO_MCP_HOST", "127.0.0.1")
+    application = server.streamable_http_app(streamable_http_path="/mcp", host=host)
+    application.add_middleware(MCPTokenAuth, token=os.environ.get("NOVOSALDO_MCP_TOKEN", ""))
+    uvicorn.run(application, host=host, port=int(os.environ.get("NOVOSALDO_MCP_PORT", "8000")))

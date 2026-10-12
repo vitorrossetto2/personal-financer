@@ -101,6 +101,8 @@ If using a custom domain, register its exact HTTPS callback instead. Only the
 verified Google email in `NOVOSALDO_ALLOWED_EMAIL` can sign in. The Worker uses
 Fetch for token exchange and UserInfo, with OAuth state and PKCE verification.
 It never exposes the local MCP server or enables the local authentication bypass.
+Requests to `/mcp` and its subpaths return 404 before reaching Flask, for every
+HTTP method. The separate local MCP server requires `NOVOSALDO_MCP_TOKEN`.
 Production HTTPS responses use secure session cookies. Missing session secrets
 produce a configuration error rather than a random, unstable session key.
 

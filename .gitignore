@@ -20,5 +20,7 @@ cloudflare/.venv-workers/
 cloudflare/python_modules/
 instance/local-server.stderr.log
 instance/local-server.stdout.log
+instance/server-error.log
+instance/server-output.log
 
 instance/backups/

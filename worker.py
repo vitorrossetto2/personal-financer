@@ -26,6 +26,9 @@ class WorkerConfiguration:
         self.application = application
 
     def __call__(self, environ, start_response):
+        path = environ.get("PATH_INFO", "")
+        if path == "/mcp" or path.startswith("/mcp/"):
+            return Response("Not found", status=404)(environ, start_response)
         env = environ["workers.env"]
         secret = str(getattr(env, "NOVOSALDO_SECRET_KEY", "") or "")
         if not secret:

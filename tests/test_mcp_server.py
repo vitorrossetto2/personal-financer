@@ -5,6 +5,8 @@ import sys
 import tempfile
 import unittest
 import urllib.request
+import urllib.error
+import httpx2
 from pathlib import Path
 
 from mcp import ClientSession
@@ -30,19 +32,29 @@ def create_statement(path: Path):
 
 class MCPServerIntegrationTests(unittest.IsolatedAsyncioTestCase):
     async def test_http_tools_read_write_and_deduplicate_statement(self):
+        await self.exercise_http_server("run.py", "NOVOSALDO_PORT")
+
+    async def test_standalone_server_requires_authentication(self):
+        await self.exercise_http_server("mcp_server.py", "NOVOSALDO_MCP_PORT")
+
+    async def exercise_http_server(self, entrypoint, port_setting):
         with tempfile.TemporaryDirectory() as directory:
             temp_dir = Path(directory)
             statement_path = temp_dir / "fatura.xlsx"
             create_statement(statement_path)
             env = dict(os.environ)
             env["NOVOSALDO_DATABASE"] = str(temp_dir / "financeiro.db")
+            env["NOVOSALDO_MCP_TOKEN"] = "integration-test-private-token"
+            env["NOVOSALDO_MCP_ENABLED"] = "true"
             with socket.socket() as available_socket:
                 available_socket.bind(("127.0.0.1", 0))
                 port = available_socket.getsockname()[1]
-            env["NOVOSALDO_PORT"] = str(port)
+            env[port_setting] = str(port)
+            env["NOVOSALDO_HOST"] = "127.0.0.1"
+            env["NOVOSALDO_MCP_HOST"] = "127.0.0.1"
             process = await asyncio.create_subprocess_exec(
                 sys.executable,
-                str(PROJECT_DIR / "run.py"),
+                str(PROJECT_DIR / entrypoint),
                 cwd=PROJECT_DIR,
                 env=env,
                 stdout=asyncio.subprocess.DEVNULL,
@@ -55,16 +67,24 @@ class MCPServerIntegrationTests(unittest.IsolatedAsyncioTestCase):
                         error = (await process.stderr.read()).decode(errors="replace")
                         self.fail(f"Servidor HTTP encerrou durante a inicialização: {error}")
                     try:
-                        await asyncio.to_thread(urllib.request.urlopen, base_url, timeout=1)
+                        try:
+                            await asyncio.to_thread(urllib.request.urlopen, base_url + "/mcp", timeout=1)
+                        except urllib.error.HTTPError as response:
+                            self.assertEqual(response.code, 401)
                         break
                     except Exception:
                         await asyncio.sleep(0.05)
                 else:
                     self.fail("Servidor HTTP não iniciou dentro do prazo.")
 
-                async with streamable_http_client(f"{base_url}/mcp") as (read_stream, write_stream):
-                    async with ClientSession(read_stream, write_stream) as session:
-                        await self.exercise_tools(session, statement_path)
+                for method in ("GET", "POST", "DELETE"):
+                    with self.assertRaises(urllib.error.HTTPError) as denied:
+                        await asyncio.to_thread(urllib.request.urlopen, urllib.request.Request(f"{base_url}/mcp", method=method))
+                    self.assertEqual(denied.exception.code, 401)
+                async with httpx2.AsyncClient(headers={"Authorization": "Bearer " + env["NOVOSALDO_MCP_TOKEN"]}) as http:
+                    async with streamable_http_client(f"{base_url}/mcp", http_client=http) as (read_stream, write_stream):
+                        async with ClientSession(read_stream, write_stream) as session:
+                            await self.exercise_tools(session, statement_path)
             finally:
                 if process.returncode is None:
                     process.terminate()

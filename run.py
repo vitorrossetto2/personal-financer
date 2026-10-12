@@ -6,9 +6,11 @@ import uvicorn
 from starlette.applications import Starlette
 from starlette.middleware.wsgi import WSGIMiddleware
 from starlette.routing import Mount
+from starlette.middleware import Middleware
 
 from app import app as flask_app
 from mcp_server import server as mcp_server
+from mcp_auth import MCPTokenAuth
 
 
 host = os.environ.get("NOVOSALDO_HOST", "127.0.0.1")
@@ -24,6 +26,7 @@ if mcp_enabled:
     app = Starlette(
         routes=[*mcp_http_app.routes, Mount("/", app=WSGIMiddleware(flask_app))],
         lifespan=mcp_http_app.router.lifespan_context,
+        middleware=[Middleware(MCPTokenAuth, token=os.environ.get("NOVOSALDO_MCP_TOKEN", ""))],
     )
 else:
     app = Starlette(routes=[Mount("/", app=WSGIMiddleware(flask_app))])

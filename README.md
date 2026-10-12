@@ -30,7 +30,7 @@ Caso ainda não tenha o `uv`, instale-o seguindo as instruções em `https://doc
 python -c "import secrets; print(secrets.token_hex(32))"
 ```
 
-O arquivo `.env` é ignorado pelo Git. Em uma publicação real, cadastre também a URI HTTPS exata do site no Google Cloud, defina `NOVOSALDO_HTTPS=true` e mantenha as quatro variáveis como segredos do ambiente. A URI precisa corresponder exatamente à cadastrada no Google. O endpoint MCP é ativado automaticamente somente no endereço local; mantenha `NOVOSALDO_MCP_ENABLED=false` ao publicar o site para que ele não seja uma entrada alternativa sem o login Google.
+O arquivo `.env` é ignorado pelo Git. Em uma publicação real, cadastre também a URI HTTPS exata do site no Google Cloud, defina `NOVOSALDO_HTTPS=true` e mantenha as quatro variáveis como segredos do ambiente. A URI precisa corresponder exatamente à cadastrada no Google. O endpoint MCP é ativado automaticamente somente no endereço local; mantenha `NOVOSALDO_MCP_ENABLED=false` ao publicar o site. O Cloudflare não inclui o servidor MCP e responde 404 em `/mcp`.
 
 Sem essas configurações, o sistema permanece bloqueado e a tela de login indica quais valores estão faltando.
 
@@ -52,6 +52,12 @@ uv run python run.py
 ```
 
 A interface fica em `http://127.0.0.1:5000` e o endpoint MCP em `http://127.0.0.1:5000/mcp`.
+
+O MCP exige um token privado em todas as requisições, inclusive locais. Configure `NOVOSALDO_MCP_TOKEN` no `.env`; sem ele, o endpoint retorna 503. Clientes devem enviar `Authorization: Bearer <token>`; credenciais ausentes ou inválidas retornam 401. O login Google e a dispensa de login local não substituem esse token.
+
+A configuração do Codex usa `bearer_token_env_var = "NOVOSALDO_MCP_TOKEN"`. Disponibilize a mesma variável no ambiente do processo Codex antes de iniciá-lo e reinicie o cliente após configurá-la. Guarde o token fora do Git. Ao expor o MCP em outra máquina, use HTTPS.
+
+Referência: [configuração MCP do Codex](https://developers.openai.com/codex/mcp/).
 
 Para executar apenas o MCP, sem a interface web, use `uv run python mcp_server.py`; nesse modo, ele fica disponível em `http://127.0.0.1:8000/mcp`.
 
